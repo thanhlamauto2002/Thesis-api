@@ -3,14 +3,14 @@ import { env } from './config/environment'
 import express from 'express'
 import exitHook from 'async-exit-hook'
 import { CONNECT_DB, GET_DB, CLOSE_DB } from '~/config/mongodb'
+import { APIs_V1 } from './routes/v1'
 const START_SERVER = () => {
 
   const app = express()
 
-
+  app.use('/v1', APIs_V1)
   app.get('/', async (req, res) => {
-    console.log(process.env)
-    process.exit(0)
+
     res.end('<h1>Hello World!</h1><hr>')
   })
 
