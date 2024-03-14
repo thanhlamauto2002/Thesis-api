@@ -10,4 +10,7 @@ Router.route('/')
 
   })
   .post(userValidation.createNew, userController.createNew)
+// Router.route('/:id')
+//   .get(userController.getUser)
+//   .put()
 export const userRoute = Router
