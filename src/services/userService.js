@@ -5,6 +5,7 @@ import { slugify } from '~/utils/formaters'
 import { userModel } from '~/models/userModel'
 import { StatusCodes } from 'http-status-codes'
 
+// hàm tạo user
 const createNew = async (reqBody) => {
   // eslint-disable-next-line no-useless-catch
   try {
@@ -12,34 +13,30 @@ const createNew = async (reqBody) => {
       ...reqBody,
       slug: slugify(reqBody.email)
     }
-    // Tạo bản ghi
     const createUser = await userModel.createNew(newUser)
-    // Lấy bản ghi
-    const getNewUser = await userModel.findOneById(createUser.insertedId.toString())
-    // eslint-disable-next-line no-console
-
-
-    return getNewUser
-
+    return createUser
   } catch (error) {
     throw error
   }
 }
+// hàm check password
 
-const getUser = async (userId) => {
+
+
+// Hàm xử lý đăng nhập
+const handleUserLogin = async (data) => {
   // eslint-disable-next-line no-useless-catch
   try {
-    const user = await userModel.getUser(userId)
-    if (!user) {
-      throw new ApiError(StatusCodes.NOT_FOUND, 'User not found!')
-    }
-    // eslint-disable-next-line no-console
-    return user
+    const handleLogin = await userModel.handleUserLogin(data)
+    return handleLogin
   } catch (error) {
     throw error
   }
+
 }
+
+
 export const userService = {
   createNew,
-  getUser
+  handleUserLogin
 }

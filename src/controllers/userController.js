@@ -2,6 +2,7 @@ import Joi from 'joi'
 import { userService } from '~/services/userService'
 import { StatusCodes } from 'http-status-codes'
 
+//hàm tạo user
 const createNew = async (req, res, next) => {
   try {
     const createUser = await userService.createNew(req.body)
@@ -10,15 +11,18 @@ const createNew = async (req, res, next) => {
   } catch (error) { next(error) }
 }
 
-const getUser = async (req, res, next) => {
+// Hàm xử lý đăng nhập
+const handleUserLogin = async (req, res, next) => {
   try {
-    const userId = req.params.id
-    const user = await userService.getUser(userId)
-    res.status(StatusCodes.OK).json(user)
-
-  } catch (error) { next(error) }
+    const handleLogin = await userService.handleUserLogin(req.body)
+    res.status(200).json(handleLogin)
+  } catch (error) {
+    next(error)
+  }
 }
+
+
 export const userController = {
   createNew,
-  getUser
+  handleUserLogin
 }
