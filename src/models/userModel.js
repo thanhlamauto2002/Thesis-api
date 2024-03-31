@@ -2,7 +2,7 @@ import Joi from 'joi'
 import { GET_DB } from '~/config/mongodb'
 import { ObjectId } from 'mongodb'
 import bcrypt from 'bcrypt'
-import e from 'cors'
+// import e from 'cors'
 const USER_COLLECTION_NAME = 'users'
 const USER_COLLECTION_SCHEMA = Joi.object({
   email: Joi.string().email().required(),
@@ -59,7 +59,10 @@ const handleUserLogin = async (data) => {
       return { message: 'Invalid email or password' }
     }
     // Nếu email và password khớp, trả về thành công
-    return { message: 'Login successful' }
+    return {
+      success: true,
+      message: 'Login OK'
+    }
   } catch (error) {
     throw new Error(error)
   }

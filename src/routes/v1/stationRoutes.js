@@ -1,12 +1,13 @@
 import express from 'express'
+import { listStationValidation } from '~/validations/listStation'
+import { listStationCtrl } from '~/controllers/listStationCtrl'
 import { StatusCodes } from 'http-status-codes'
-import { stationValidation } from '~/validations/userValidation'
+
 const Router = express.Router()
 
-Router.route('/')
-  .get((req, res) => {
-    res.status(StatusCodes.OK).json({ message: 'GET: API get list station' })
+Router.route('/create')
+  .post(listStationValidation.createNew, listStationCtrl.createNew)
 
-  })
-  .post(stationValidation.createNew)
+Router.route('/get')
+  .get(listStationCtrl.getStation)
 export const stationRoutes = Router
