@@ -19,7 +19,6 @@ const createNew = async (reqBody) => {
     throw error
   }
 }
-// hàm check password
 
 
 
