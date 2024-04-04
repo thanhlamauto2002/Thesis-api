@@ -20,7 +20,21 @@ const getData = async (res, startDate, endDate) => {
     throw new Error(error)
   }
 }
+
+//Hàm lấy data vẽ chart từ db
+const getDataChart = async (res, option) => {
+
+  try {
+
+    const data = await station2Service.getDataChart(option)
+    res.status(201).json(data)
+  } catch (error) {
+    throw new Error(error)
+  }
+}
+
 export const station2Controller = {
   createNew,
-  getData
+  getData,
+  getDataChart
 }

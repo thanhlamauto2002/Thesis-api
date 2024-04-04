@@ -8,6 +8,7 @@ import { hgRoute } from './station2route'
 import { tvRoute } from './station3route'
 import { stationRoutes } from './stationRoutes'
 import { dataReport } from './dataReportRoute'
+import { dataChart } from './dataChart'
 const Router = express.Router()
 
 Router.get('/status', (req, res) => {
@@ -19,5 +20,6 @@ Router.use('/datahgstation', hgRoute)
 Router.use('/datatvstation', tvRoute)
 Router.use('/liststation', stationRoutes)
 Router.use('/getdatareport', dataReport)
+Router.use('/getdatachart', dataChart)
 export const APIs_V1 = Router
 

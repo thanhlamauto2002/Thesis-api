@@ -10,7 +10,7 @@ const createNew = async (req, res, next) => {
   } catch (error) { next(error) }
 }
 
-// Hàm lấy data từ db
+// Hàm lấy data report từ db
 const getData = async (res, startDate, endDate) => {
 
   try {
@@ -21,8 +21,20 @@ const getData = async (res, startDate, endDate) => {
     throw new Error(error)
   }
 }
+//Hàm lấy data vẽ chart từ db
+const getDataChart = async (res, option) => {
+
+  try {
+
+    const data = await station1Service.getDataChart(option)
+    res.status(201).json(data)
+  } catch (error) {
+    throw new Error(error)
+  }
+}
 
 export const station1Controller = {
   createNew,
-  getData
+  getData,
+  getDataChart
 }

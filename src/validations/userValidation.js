@@ -4,7 +4,10 @@ import ApiError from '~/utils/ApiError'
 const createNew = async (req, res, next) => {
   const correctCondition = Joi.object({
     email: Joi.string().email().required(),
-    password: Joi.string().min(6).required()
+    username: Joi.string().required(),
+    password: Joi.string().min(6).required(),
+    role: Joi.string().valid('Admin', 'Engineer', 'Guess').default('Guess')
+
   })
   try {
     await correctCondition.validateAsync(req.body, { abortEarly: false })
