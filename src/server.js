@@ -7,11 +7,13 @@ import exitHook from 'async-exit-hook'
 import { CONNECT_DB, GET_DB, CLOSE_DB } from '~/config/mongodb'
 import { APIs_V1 } from './routes/v1'
 import { errorHandlingMiddleware } from './middlewares/errorHandlingMiddleware'
-import { station1Controller } from '~/controllers/stationBk';
-
+import { createJWT, verifyToken } from '~/middlewares/JWTaction'
+var cookieParser = require('cookie-parser')
 const { Server } = require('socket.io')
 const http = require('http')
 const app = express()
+app.use(cookieParser())
+
 const server = http.createServer(app)
 const io = new Server(server, {
   cors: {
@@ -63,7 +65,9 @@ const START_SERVER = async () => {
 
   //Middleware xử lý lỗi tập trung
   app.use(errorHandlingMiddleware)
+  // test JWT
 
+  // phần khác
   app.get('/', async (req, res) => {
     // process.exit(0)
     res.end('<h1>Hello World!</h1><hr>')

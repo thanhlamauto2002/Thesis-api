@@ -29,8 +29,17 @@ const getData = async (startDate, endDate) => {
   }
 }
 
-
+const getDataChart = async (option) => {
+  try {
+    const data = await station2Model.getDataChart(option)
+    return data
+  } catch (error) {
+    throw new Error(error)
+  }
+}
 export const station2Service = {
   createNew,
-  getData
+  getData,
+  getDataChart
+
 }
