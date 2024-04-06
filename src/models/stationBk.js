@@ -17,6 +17,8 @@ const BK_COLLECTION_SCHEMA = Joi.object({
 // Validate data
 
 const validateBeforeCreate = async (data) => {
+  console.log(data)
+
   return await BK_COLLECTION_SCHEMA.validateAsync(data, { abortEarly: false })
 }
 

@@ -2,12 +2,12 @@ import Joi from 'joi'
 import { StatusCodes } from 'http-status-codes'
 import { station2Service } from '~/services/stationHg'
 //hàm ghi data vào db
-const createNew = async (req, res, next) => {
+const createNew = async (dataTerminal2) => {
   try {
-    const create = await station2Service.createNew(req.body)
-    res.status(StatusCodes.CREATED).json(create)
+    const create = await station2Service.createNew(dataTerminal2)
+    // res.status(StatusCodes.CREATED).json(create)
 
-  } catch (error) { next(error) }
+  } catch (error) { throw new Error(error) }
 }
 
 // Hàm lấy data từ db

@@ -6,6 +6,7 @@ import { station1Model } from '~/models/stationBk'
 
 // hàm ghi data
 const createNew = async (reqBody) => {
+  console.log('reqbody: ', reqBody)
   // eslint-disable-next-line no-useless-catch
   try {
     const newdata = {
