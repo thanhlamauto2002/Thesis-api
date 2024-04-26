@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken'
 import { env } from '~/config/environment'
+const cookieParser = require('cookie-parser');
 
 const createJWT = (payload) => {
   let key = process.env.JWT_SECRET
@@ -25,7 +26,21 @@ const verifyToken = (token) => {
   }
   return data
 }
+const checkRoleUser = async (req, res, next) => {
+  try {
+    const token = req.query.token
+    const data = verifyToken(token)
+    if (data.role === 'Admin') {
+      next()
+    } else {
+      res.json({ message: 'You are not authorized' })
+    }
+  } catch (error) {
+    next(error)
+  }
+}
 module.exports = {
   createJWT,
-  verifyToken
+  verifyToken,
+  checkRoleUser
 }

@@ -10,9 +10,8 @@ const USER_COLLECTION_SCHEMA = Joi.object({
   email: Joi.string().email().required(),
   username: Joi.string().required(),
   password: Joi.string().min(6).required(),
-  slug: Joi.string().required().min(3).trim().strict(),
-  role: Joi.string().valid('Admin', 'Engineer', 'Guess').default('Guess')
-
+  role: Joi.string(),
+  phone: Joi.string().pattern(new RegExp(/^(09|03|07|08)[0-9]{8}$/))
 })
 //Tao ham validate truoc khi them vao db
 const salt = bcrypt.genSaltSync(10)
@@ -43,10 +42,11 @@ const createNew = async (data) => {
       const validData = await validateBeforeCreate(data)
       let hashPassword = hashUserPassword(data.password)
       validData.password = hashPassword
-      validData.role = 'Guess'
 
       const createUser = await GET_DB().collection(USER_COLLECTION_NAME).insertOne(validData)
-      return createUser
+      return {
+        success: true
+      }
     }
     return {
       EM: 'The email already exist'
@@ -69,7 +69,8 @@ const handleUserLogin = async (data) => {
     let role = user.role
     let payload = {
       email: user.email,
-      username: user.username
+      username: user.username,
+      role: user.role
     }
     let accessToken = createJWT(payload)
     return {
@@ -82,10 +83,57 @@ const handleUserLogin = async (data) => {
     throw new Error(error)
   }
 }
-
+// Hàm lấy danh sách user
+// lấy all
+const getAllUser = async () => {
+  try {
+    const cursor = await GET_DB().collection(USER_COLLECTION_NAME).find({}).toArray()
+    return cursor
+  } catch (error) {
+    throw new Error(error)
+  }
+}
+//hàm lấy 1 người dùng theo email:
+const getUser = async (data) => {
+  try {
+    const cursor = await GET_DB().collection(USER_COLLECTION_NAME).findOne({ email: data.email })
+    return cursor
+  } catch (error) {
+    throw new Error(error)
+  }
+}
+// hàm xóa người dùng
+const deleteUser = async (data) => {
+  try {
+    const cursor = await GET_DB().collection(USER_COLLECTION_NAME).deleteOne({ email: data.email })
+    return {
+      delete: true
+    }
+  } catch (error) {
+    throw new Error(error)
+  }
+}
+//update user
+const editUser = async (data) => {
+  try {
+    const cursor = await GET_DB().collection(USER_COLLECTION_NAME).updateOne(
+      { email: data.emailToEdit }, // Điều kiện tìm kiếm: tìm bản ghi với email cụ thể
+      { $set: { email: data.emailEdit, phone: data.phoneEdit, username: data.usernameEdit, role: data.roleEdit } } // Dữ liệu cần cập nhật
+    )
+    return {
+      edit: true
+    }
+  } catch (error) {
+    throw new Error(error)
+  }
+}
 export const userModel = {
   USER_COLLECTION_NAME,
   USER_COLLECTION_SCHEMA,
   createNew,
-  handleUserLogin
+  handleUserLogin,
+  getAllUser,
+  deleteUser,
+  getUser,
+  editUser
 }

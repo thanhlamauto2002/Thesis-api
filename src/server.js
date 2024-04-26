@@ -17,6 +17,7 @@ var cookieParser = require('cookie-parser')
 const { Server } = require('socket.io')
 const http = require('http')
 const app = express()
+
 app.use(cookieParser())
 
 const server = http.createServer(app)
@@ -48,13 +49,31 @@ const START_SERVER = async () => {
 
     const interval = setInterval(() => {
       fetchDataFromMongoDBAndEmitData(socket);
-    }, 10000); // 60000 milliseconds = 1 phút
-
+    }, 1000); // 60000 milliseconds = 1 phút
+    //alarm BK
+    socket.on('saveAlarmsBK', (data) => {
+      station1Controller.createNewAlarm(data)
+      console.log('Received saveAlarmsBK from client:', data);
+    });
+    //
+    //alarm HG
+    socket.on('saveAlarmsHG', (data) => {
+      station2Controller.createNewAlarm(data)
+      console.log('Received saveAlarmsHG from client:', data);
+    });
+    //
+    //alarm TV
+    socket.on('saveAlarmsTV', (data) => {
+      station3Controller.createNewAlarm(data)
+      console.log('Received saveAlarmsTV from client:', data);
+    });
+    //
     socket.on('disconnect', () => {
       console.log('user disconnected');
       clearInterval(interval); // Dừng lên lịch khi client disconnect
     });
     socket.emit('message', 'Welcome to the server!')
+
     socket.on('clientEvent', (data) => {
       console.log('Received data from client:', data)
       // Gửi phản hồi cho client
@@ -78,7 +97,9 @@ const START_SERVER = async () => {
     res.end('<h1>Hello World!</h1><hr>')
   })
   //lấy dữ liệu từ OPC UA
-  const endpointUrl = 'opc.tcp://192.168.1.154:4840';
+  // const endpointUrl = 'opc.tcp://10.143.161.1:4880';
+  const endpointUrl = 'opc.tcp://192.168.1.104:4840';
+
   const client = opcua.OPCUAClient.create({ endpoint_must_exist: false });
   (async () => {
     try {
@@ -102,24 +123,46 @@ const START_SERVER = async () => {
 
           // Mảng các nodeId cần đọc dữ liệu
           const nodeIds = [
-            'ns=2;i=3',  //CO2
-            'ns=2;i=2',  //NO2
-            'ns=2;i=4',  //SO2
-            'ns=2;i=6',  //Temp
-            'ns=2;i=5',  //O2
-            'ns=2;i=7',  //Press
-            'ns=2;i=10', //co2
-            'ns=2;i=9',  //no2
-            'ns=2;i=11', //so2
-            'ns=2;i=13',  //temp
-            'ns=2;i=12',  //o2
-            'ns=2;i=14',  //press
-            'ns=2;i=17',  //co2
-            'ns=2;i=16',  //no2
-            'ns=2;i=18',  //so2
-            'ns=2;i=20',  //temp
-            'ns=2;i=19',  //o2
-            'ns=2;i=21',  //press
+            //station1
+            'ns=2;i=2',  //no 1
+            'ns=2;i=3',  //co 1
+            'ns=2;i=4',  //SO2 1
+            'ns=2;i=5',  //O2 1
+            'ns=2;i=6',  //Temp 1
+            'ns=2;i=7',  //Dust 1
+            'ns=2;i=8',  //no status 1
+            'ns=2;i=9',  //co status1
+            'ns=2;i=10', //so2 status1
+            'ns=2;i=11', //o2 status1
+            'ns=2;i=12',  //temp status1
+            'ns=2;i=13',  //dust status1
+            //station2
+            'ns=2;i=15',  //no 2
+            'ns=2;i=16',  //co 2
+            'ns=2;i=17',  //so2 2
+            'ns=2;i=18',  //o2 2
+            'ns=2;i=19',  //temp 2
+            'ns=2;i=20',  //dust 2
+            'ns=2;i=21',  //no status 2
+            'ns=2;i=22', // co status 2
+            'ns=2;i=23',// so2 status 2
+            'ns=2;i=24', //o2 status2
+            'ns=2;i=25', //temp status 2
+            'ns=2;i=26', //dust status 2
+            //station3
+            'ns=2;i=28', //no 3
+            'ns=2;i=29', //co 3
+            'ns=2;i=30', //so2 3
+            'ns=2;i=31', //o2 3
+            'ns=2;i=32', //temp3
+            'ns=2;i=33', //dust3
+            'ns=2;i=34', //no status3
+            'ns=2;i=35', //co status3
+            'ns=2;i=36', //so2 status3
+            'ns=2;i=37', //o2 status3
+            'ns=2;i=38', //temp status3
+            'ns=2;i=39', //dust status3
+
           ];
           const nodeIdsArray = nodeIds.map(nodeId => opcua.resolveNodeId(nodeId));
 
@@ -127,42 +170,72 @@ const START_SERVER = async () => {
           session.readVariableValue(nodeIdsArray, (err, dataValues) => {
             // Đọc dữ liệu từ các nodeId
             //const dataValues = await session.read(nodeIds);
-
-            const dataTerminal1 = {
-              CO2: dataValues[0].value.value,
-              NO2: dataValues[1].value.value,
-              SO2: dataValues[2].value.value,
-              Temperature: dataValues[3].value.value,
-              O2: dataValues[4].value.value,
-              Pressure: dataValues[5].value.value,
-              Station: 'Bach Khoa'
+            const getStatus = (checkValue) => {
+              switch (checkValue) {
+                case 0:
+                  return 'Normal';
+                case 1:
+                  return 'Calib';
+                case 2:
+                  return 'Error';
+                default:
+                  return 'Unknown'; // Trường hợp không hợp lệ, bạn có thể xử lý tuỳ ý
+              }
             };
-
+            const dataTerminal1 = {
+              CO: dataValues[1].value.value,
+              NO: dataValues[0].value.value,
+              SO2: dataValues[2].value.value,
+              Temperature: dataValues[4].value.value,
+              O2: dataValues[3].value.value,
+              Dust: dataValues[5].value.value,
+              Station: 'Bach Khoa Station',
+              //status signal
+              StatusTemp: getStatus(dataValues[10].value.value),
+              StatusDust: getStatus(dataValues[11].value.value),
+              StatusO2: getStatus(dataValues[9].value.value),
+              StatusSO2: getStatus(dataValues[8].value.value),
+              StatusCO: getStatus(dataValues[7].value.value),
+              StatusNO: getStatus(dataValues[6].value.value)
+            };
             station1Controller.createNew(dataTerminal1)
 
             const dataTerminal2 = {
 
-              CO2: dataValues[6].value.value,
-              NO2: dataValues[7].value.value,
-              SO2: dataValues[8].value.value,
-              Temperature: dataValues[9].value.value,
-              O2: dataValues[10].value.value,
-              Pressure: dataValues[11].value.value,
-              Station: 'Hau Giang'
-
+              CO: dataValues[13].value.value,
+              NO: dataValues[12].value.value,
+              SO2: dataValues[14].value.value,
+              Temperature: dataValues[16].value.value,
+              O2: dataValues[15].value.value,
+              Dust: dataValues[17].value.value,
+              Station: 'Hau Giang Station',
+              //status signal
+              StatusTemp: getStatus(dataValues[22].value.value),
+              StatusDust: getStatus(dataValues[23].value.value),
+              StatusO2: getStatus(dataValues[21].value.value),
+              StatusSO2: getStatus(dataValues[20].value.value),
+              StatusCO: getStatus(dataValues[19].value.value),
+              StatusNO: getStatus(dataValues[18].value.value)
             };
+
             station2Controller.createNew(dataTerminal2)
 
             const dataTerminal3 = {
 
-              CO2: dataValues[12].value.value,
-              NO2: dataValues[13].value.value,
-              SO2: dataValues[14].value.value,
-              Temperature: dataValues[15].value.value,
-              O2: dataValues[16].value.value,
-              Pressure: dataValues[17].value.value,
-              Station: 'Tra Vinh'
-
+              CO: dataValues[25].value.value,
+              NO: dataValues[24].value.value,
+              SO2: dataValues[26].value.value,
+              Temperature: dataValues[28].value.value,
+              O2: dataValues[27].value.value,
+              Dust: dataValues[29].value.value,
+              Station: 'Tra Vinh Station',
+              //status signal
+              StatusTemp: getStatus(dataValues[34].value.value),
+              StatusDust: getStatus(dataValues[35].value.value),
+              StatusO2: getStatus(dataValues[33].value.value),
+              StatusSO2: getStatus(dataValues[32].value.value),
+              StatusCO: getStatus(dataValues[31].value.value),
+              StatusNO: getStatus(dataValues[30].value.value)
             };
             station3Controller.createNew(dataTerminal3)
 

@@ -9,22 +9,36 @@ const Router = express.Router()
 Router.route('/')
   .get(async (req, res) => {
     try {
-      const { station, startDate, endDate } = req.query
-      console.log('station: ', station)
-
-      if (!station || !startDate || !endDate) {
+      const { station, option, startDate, endDate } = req.query
+      if (!station || !option || !startDate || !endDate) {
         return res.status(400).json({ error: 'Missing parameters' });
       }
       switch (station) {
         case 'BK':
-          await station1Controller.getData(res, startDate, endDate)
+          if (option === 'data') {
+            await station1Controller.getData(res, startDate, endDate);
+          } else if (option === 'alarm') {
+            await station1Controller.getAlarms(res, startDate, endDate);
+          } else {
+            return res.status(400).json({ error: 'Invalid option' });
+          }
           break;
         case 'HG':
-          station2Controller.getData(res, startDate, endDate)
-          break;
+          if (option === 'data') {
+            await station2Controller.getData(res, startDate, endDate);
+          } else if (option === 'alarm') {
+            await station2Controller.getAlarms(res, startDate, endDate);
+          } else {
+            return res.status(400).json({ error: 'Invalid option' });
+          } break;
         case 'TV':
-          station3Controller.getData(res, startDate, endDate)
-          break;
+          if (option === 'data') {
+            await station3Controller.getData(res, startDate, endDate);
+          } else if (option === 'alarm') {
+            await station3Controller.getAlarms(res, startDate, endDate);
+          } else {
+            return res.status(400).json({ error: 'Invalid option' });
+          } break;
         default:
           return res.status(400).json({ error: 'Invalid selectedStation' });
       }

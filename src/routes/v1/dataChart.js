@@ -10,7 +10,6 @@ Router.route('/')
   .get(async (req, res) => {
     try {
       const { station, option } = req.query
-      console.log('station: ', station)
 
 
       if (!station || !option) {
