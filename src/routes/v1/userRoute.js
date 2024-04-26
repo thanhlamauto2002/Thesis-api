@@ -2,13 +2,28 @@ import express from 'express'
 import { StatusCodes } from 'http-status-codes'
 import { userValidation } from '~/validations/userValidation'
 import { userController } from '~/controllers/userController'
+import { checkRoleUser } from '~/middlewares/JWTaction'
 const Router = express.Router()
 
-Router.route('/createuser')
-  .post(userValidation.createNew, userController.createNew)
-// Router.route('/:id')
-//   .get(userController.getUser)
-//   .put()
+//api xử lý login
 Router.route('/checkuser')
   .post(userController.handleUserLogin)
+//api thêm user
+Router.route('/createuser')
+  .post(checkRoleUser, userController.createNew)
+//api xóa user
+Router.route('/deleteuser')
+  .post(checkRoleUser, userController.deleteUser)
+//api sửa thông tin user
+Router.route('/edituser')
+  .post(checkRoleUser, userController.editUser)
+//api lấy all user
+Router.route('/getalluser')
+  .get(userController.getAllUser)
+//api lấy 1 user
+Router.route('/getuser')
+  .get(userController.getUser)
+//api decode token
+Router.route('/verifytoken')
+  .post(userController.handToken)
 export const userRoute = Router

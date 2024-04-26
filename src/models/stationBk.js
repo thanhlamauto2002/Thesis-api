@@ -5,19 +5,24 @@ const moment = require('moment');
 const BK_COLLECTION_NAME = 'BKstation'
 const BK_COLLECTION_SCHEMA = Joi.object({
   SO2: Joi.number().required(),
-  NO2: Joi.number().required(),
-  CO2: Joi.number().required(),
+  NO: Joi.number().required(),
+  CO: Joi.number().required(),
   O2: Joi.number().required(),
   Temperature: Joi.number().required(),
-  Pressure: Joi.number().required(),
+  Dust: Joi.number().required(),
   Station: Joi.string().required(),
+  StatusTemp: Joi.string().required(),
+  StatusDust: Joi.string().required(),
+  StatusSO2: Joi.string().required(),
+  StatusCO: Joi.string().required(),
+  StatusNO: Joi.string().required(),
+  StatusO2: Joi.string().required(),
   createdAt: Joi.date().timestamp('javascript').default(Date.now)
 })
 
 // Validate data
 
 const validateBeforeCreate = async (data) => {
-  console.log(data)
 
   return await BK_COLLECTION_SCHEMA.validateAsync(data, { abortEarly: false })
 }
@@ -51,6 +56,7 @@ const getData = async (startDate, endDate) => {
     throw new Error(error)
   }
 }
+
 //Hàm lấy data vẽ chart
 
 const getDataChart = async (option) => {
@@ -75,8 +81,6 @@ const getDataChart = async (option) => {
       default:
         throw new Error('Invalid option')
     }
-    console.log(data1)
-    console.log('option: ', option)
 
     return data1
   } catch (error) {

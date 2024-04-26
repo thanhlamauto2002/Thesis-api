@@ -3,10 +3,9 @@
 import ApiError from '~/utils/ApiError'
 import { StatusCodes } from 'http-status-codes'
 import { station1Model } from '~/models/stationBk'
-
+import { station1AlarmModel } from '~/models/alarmBK'
 // hàm ghi data
 const createNew = async (reqBody) => {
-  console.log('reqbody: ', reqBody)
   // eslint-disable-next-line no-useless-catch
   try {
     const newdata = {
@@ -37,8 +36,35 @@ const getDataChart = async (option) => {
     throw new Error(error)
   }
 }
+//Hàm ghi alarm
+const createNewAlarm = async (reqBody) => {
+  // eslint-disable-next-line no-useless-catch
+  try {
+    console.log('reqbody: ', reqBody)
+    // const newdata = {
+    //   ...reqBody
+    // }
+
+    const createData = await station1AlarmModel.createNew(reqBody)
+    return createData
+  } catch (error) {
+    throw error
+  }
+}
+
+const getAlarms = async (startDate, endDate) => {
+  try {
+    const data = await station1AlarmModel.getAlarms(startDate, endDate)
+    return data
+  } catch (error) {
+    throw new Error(error)
+  }
+}
+
 export const station1Service = {
   createNew,
   getData,
-  getDataChart
+  getDataChart,
+  createNewAlarm,
+  getAlarms
 }

@@ -6,6 +6,9 @@ const Router = express.Router()
 Router.route('/createdata')
   .post(station1Controller.createNew)
 
+Router.route('/createalarm')
+  .post(station1Controller.createNewAlarm)
+
 
 Router.route('/getbkstation')
   .get(station1Controller.getData)
