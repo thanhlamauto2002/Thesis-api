@@ -1,4 +1,3 @@
-import Joi from 'joi'
 import { userService } from '~/services/userService'
 import { StatusCodes } from 'http-status-codes'
 import { verifyToken } from '~/middlewares/JWTaction'
@@ -53,7 +52,6 @@ const getUser = async (req, res) => {
 // hàm xóa user
 const deleteUser = async (req, res) => {
   try {
-    console.log(req.cookies.jwt)
     const getData = await userService.deleteUser(req.body)
     res.status(201).json(getData)
   } catch (error) {

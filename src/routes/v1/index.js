@@ -10,6 +10,7 @@ import { stationRoutes } from './stationRoutes'
 import { dataReport } from './dataReportRoute'
 import { dataChart } from './dataChart'
 import { ExportReport } from './ExportReport'
+import { OPCRoute } from './OPCRoute'
 const Router = express.Router()
 
 Router.get('/status', (req, res) => {
@@ -23,6 +24,8 @@ Router.use('/liststation', stationRoutes)
 Router.use('/getdatareport', dataReport)
 Router.use('/getdatachart', dataChart)
 Router.use('/export', ExportReport)
+Router.use('/createopcserver', OPCRoute)
+
 
 export const APIs_V1 = Router
 
