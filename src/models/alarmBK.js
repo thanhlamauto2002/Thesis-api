@@ -1,7 +1,5 @@
 import Joi, { number } from 'joi'
 import { GET_DB } from '~/config/mongodb'
-const { ObjectId } = require('mongodb');
-const moment = require('moment');
 const ALARM_BK_COLLECTION_NAME = 'AlarmBK'
 const ALARM_BK_COLLECTION_SCHEMA = Joi.object({
   date: Joi.number().required(),
@@ -21,6 +19,7 @@ const validateBeforeCreate = async (data) => {
 
   return await ALARM_BK_ARRAY_SCHEMA.validateAsync(data, { abortEarly: false })
 }
+
 const createNew = async (data) => {
   try {
     const validData = await validateBeforeCreate(data)

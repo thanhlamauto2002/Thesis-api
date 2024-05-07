@@ -1,8 +1,7 @@
 import Joi from 'joi'
 import { GET_DB } from '~/config/mongodb'
-import { ObjectId } from 'mongodb'
 import bcrypt from 'bcrypt'
-import { createJWT, verifyToken } from '~/middlewares/JWTaction'
+import { createJWT } from '~/middlewares/JWTaction'
 
 // import e from 'cors'
 const USER_COLLECTION_NAME = 'users'
@@ -13,10 +12,21 @@ const USER_COLLECTION_SCHEMA = Joi.object({
   role: Joi.string(),
   phone: Joi.string().pattern(new RegExp(/^(09|03|07|08)[0-9]{8}$/))
 })
+//schema modify
+const USER_COLLECTION_SCHEMA_MODIFY = Joi.object({
+  email: Joi.string().email().required(),
+  username: Joi.string().required(),
+  role: Joi.string(),
+  phone: Joi.string().pattern(new RegExp(/^(09|03|07|08)[0-9]{8}$/))
+})
 //Tao ham validate truoc khi them vao db
 const salt = bcrypt.genSaltSync(10)
 const validateBeforeCreate = async (data) => {
   return await USER_COLLECTION_SCHEMA.validateAsync(data, { abortEarly: false })
+}
+//Tao ham validate truoc khi chinh sua
+const validateBeforeEdit = async (data) => {
+  return await USER_COLLECTION_SCHEMA_MODIFY.validateAsync(data, { abortEarly: false })
 }
 //Hàm check email tồn tại
 const checkEmailExist = async (userEmail) => {
@@ -116,9 +126,16 @@ const deleteUser = async (data) => {
 //update user
 const editUser = async (data) => {
   try {
+    const dataEdit = {
+      email: data.emailEdit,
+      phone: data.phoneEdit,
+      username: data.usernameEdit,
+      role: data.roleEdit
+    }
+    const validDataEdit = await validateBeforeEdit(dataEdit)
     const cursor = await GET_DB().collection(USER_COLLECTION_NAME).updateOne(
       { email: data.emailToEdit }, // Điều kiện tìm kiếm: tìm bản ghi với email cụ thể
-      { $set: { email: data.emailEdit, phone: data.phoneEdit, username: data.usernameEdit, role: data.roleEdit } } // Dữ liệu cần cập nhật
+      { $set: { email: validDataEdit.email, phone: validDataEdit.phone, username: validDataEdit.username, role: validDataEdit.role } } // Dữ liệu cần cập nhật
     )
     return {
       edit: true

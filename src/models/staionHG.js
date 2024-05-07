@@ -17,7 +17,9 @@ const HG_COLLECTION_SCHEMA = Joi.object({
   StatusCO: Joi.string().required(),
   StatusNO: Joi.string().required(),
   StatusO2: Joi.string().required(),
-  createdAt: Joi.date().timestamp('javascript').default(Date.now)
+  StatusConnect: Joi.string().required(),
+  createdAt: Joi.number().required()
+  // createdAt: Joi.date().timestamp('javascript').default(Date.now)
 })
 
 // Validate data

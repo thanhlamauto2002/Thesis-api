@@ -1,5 +1,3 @@
-import Joi from 'joi'
-import { StatusCodes } from 'http-status-codes'
 import { station1Service } from '~/services/stationBk'
 //hàm ghi data vào db
 const createNew = async (dataTerminal1) => {

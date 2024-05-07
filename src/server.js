@@ -36,7 +36,7 @@ const START_SERVER = async () => {
       const data3 = await GET_DB().collection('TVstation').findOne({}, { sort: { _id: -1 } })
 
       // Gửi dữ liệu đến client
-      io.emit('data', { data1, data2, data3 })
+      // io.emit('data', { data1, data2, data3 })
     } catch (error) {
       console.error('Error fetching data from MongoDB:', error);
     }
@@ -94,16 +94,18 @@ const START_SERVER = async () => {
   })
   //lấy dữ liệu từ OPC UA
   // const endpointUrl = 'opc.tcp://10.143.161.1:4880';
-  const endpointUrl = 'opc.tcp://192.168.1.84:4840';
-
+  const endpointUrl = 'opc.tcp://192.168.220.151:4840';
+  let opcConnected = false;
   const client = opcua.OPCUAClient.create({ endpoint_must_exist: false });
   (async () => {
     try {
       // Kết nối đến OPC UA server
       await client.connect(endpointUrl);
-
       console.log('Đã kết nối tới OPC UA server');
 
+      client.on('backoff', () => {
+        io.emit('disconnectOPC', 'OPC UA disconnected');
+      });
       // Tạo một session
       const session = await client.createSession();
 
@@ -132,33 +134,35 @@ const START_SERVER = async () => {
             'ns=2;i=11', //o2 status1
             'ns=2;i=12',  //temp status1
             'ns=2;i=13',  //dust status1
+            'ns=2;i=14', //disconnect 1
             //station2
-            'ns=2;i=15',  //no 2
-            'ns=2;i=16',  //co 2
-            'ns=2;i=17',  //so2 2
-            'ns=2;i=18',  //o2 2
-            'ns=2;i=19',  //temp 2
-            'ns=2;i=20',  //dust 2
-            'ns=2;i=21',  //no status 2
-            'ns=2;i=22', // co status 2
-            'ns=2;i=23',// so2 status 2
-            'ns=2;i=24', //o2 status2
-            'ns=2;i=25', //temp status 2
-            'ns=2;i=26', //dust status 2
+            'ns=2;i=16',  //no 2
+            'ns=2;i=17',  //co 2
+            'ns=2;i=18',  //so2 2
+            'ns=2;i=19',  //o2 2
+            'ns=2;i=20',  //temp 2
+            'ns=2;i=21',  //dust 2
+            'ns=2;i=22',  //no status 2
+            'ns=2;i=23', // co status 2
+            'ns=2;i=24',// so2 status 2
+            'ns=2;i=25', //o2 status2
+            'ns=2;i=26', //temp status 2
+            'ns=2;i=27', //dust status 2
+            'ns=2;i=28', //disconnect 2
             //station3
-            'ns=2;i=28', //no 3
-            'ns=2;i=29', //co 3
-            'ns=2;i=30', //so2 3
-            'ns=2;i=31', //o2 3
-            'ns=2;i=32', //temp3
-            'ns=2;i=33', //dust3
-            'ns=2;i=34', //no status3
-            'ns=2;i=35', //co status3
-            'ns=2;i=36', //so2 status3
-            'ns=2;i=37', //o2 status3
-            'ns=2;i=38', //temp status3
-            'ns=2;i=39', //dust status3
-
+            'ns=2;i=30', //no 3
+            'ns=2;i=31', //co 3
+            'ns=2;i=32', //so2 3
+            'ns=2;i=33', //o2 3
+            'ns=2;i=34', //temp3
+            'ns=2;i=35', //dust3
+            'ns=2;i=36', //no status3
+            'ns=2;i=37', //co status3
+            'ns=2;i=38', //so2 status3
+            'ns=2;i=39', //o2 status3
+            'ns=2;i=40', //temp status3
+            'ns=2;i=41', //dust status3
+            'ns=2;i=42', //disconnect 3
           ];
           const nodeIdsArray = nodeIds.map(nodeId => opcua.resolveNodeId(nodeId));
 
@@ -178,62 +182,79 @@ const START_SERVER = async () => {
                   return 'Unknown'; // Trường hợp không hợp lệ, bạn có thể xử lý tuỳ ý
               }
             };
-            const dataTerminal1 = {
-              CO: dataValues[1].value.value.toFixed(2),
-              NO: dataValues[0].value.value.toFixed(2),
-              SO2: dataValues[2].value.value.toFixed(2),
-              Temperature: dataValues[4].value.value.toFixed(2),
-              O2: dataValues[3].value.value.toFixed(2),
-              Dust: dataValues[5].value.value.toFixed(2),
+            const getStatusConnect = (checkValue) => {
+              switch (checkValue) {
+                case 0:
+                  return 'Connected';
+                case 1:
+                  return 'Disconnected';
+                default:
+                  return 'Unknown'; // Trường hợp không hợp lệ, bạn có thể xử lý tuỳ ý
+              }
+            };
+            const data1 = {
+              CO: dataValues[1].value.value,
+              NO: dataValues[0].value.value,
+              SO2: dataValues[2].value.value,
+              Temperature: dataValues[4].value.value,
+              O2: dataValues[3].value.value,
+              Dust: dataValues[5].value.value,
               Station: 'Bach Khoa Station',
+              createdAt: new Date().getTime(),
               //status signal
               StatusTemp: getStatus(dataValues[10].value.value),
               StatusDust: getStatus(dataValues[11].value.value),
               StatusO2: getStatus(dataValues[9].value.value),
               StatusSO2: getStatus(dataValues[8].value.value),
               StatusCO: getStatus(dataValues[7].value.value),
-              StatusNO: getStatus(dataValues[6].value.value)
+              StatusNO: getStatus(dataValues[6].value.value),
+              StatusConnect: getStatusConnect((dataValues[12].value.value))
             };
-            station1Controller.createNew(dataTerminal1)
+            station1Controller.createNew(data1)
 
-            const dataTerminal2 = {
+            const data2 = {
 
-              CO: dataValues[13].value.value.toFixed(2),
-              NO: dataValues[12].value.value.toFixed(2),
-              SO2: dataValues[14].value.value.toFixed(2),
-              Temperature: dataValues[16].value.value.toFixed(2),
-              O2: dataValues[15].value.value.toFixed(2),
-              Dust: dataValues[17].value.value.toFixed(2),
+              CO: dataValues[14].value.value,
+              NO: dataValues[13].value.value,
+              SO2: dataValues[15].value.value,
+              Temperature: dataValues[17].value.value,
+              O2: dataValues[16].value.value,
+              Dust: dataValues[18].value.value,
               Station: 'Hau Giang Station',
+              createdAt: new Date().getTime(),
               //status signal
-              StatusTemp: getStatus(dataValues[22].value.value),
-              StatusDust: getStatus(dataValues[23].value.value),
-              StatusO2: getStatus(dataValues[21].value.value),
-              StatusSO2: getStatus(dataValues[20].value.value),
-              StatusCO: getStatus(dataValues[19].value.value),
-              StatusNO: getStatus(dataValues[18].value.value)
+              StatusTemp: getStatus(dataValues[23].value.value),
+              StatusDust: getStatus(dataValues[24].value.value),
+              StatusO2: getStatus(dataValues[22].value.value),
+              StatusSO2: getStatus(dataValues[21].value.value),
+              StatusCO: getStatus(dataValues[20].value.value),
+              StatusNO: getStatus(dataValues[19].value.value),
+              StatusConnect: getStatusConnect((dataValues[25].value.value))
             };
 
-            station2Controller.createNew(dataTerminal2)
+            station2Controller.createNew(data2)
 
-            const dataTerminal3 = {
+            const data3 = {
 
-              CO: dataValues[25].value.value.toFixed(2),
-              NO: dataValues[24].value.value.toFixed(2),
-              SO2: dataValues[26].value.value.toFixed(2),
-              Temperature: dataValues[28].value.value.toFixed(2),
-              O2: dataValues[27].value.value.toFixed(2),
-              Dust: dataValues[29].value.value.toFixed(2),
+              CO: dataValues[27].value.value,
+              NO: dataValues[26].value.value,
+              SO2: dataValues[28].value.value,
+              Temperature: dataValues[30].value.value,
+              O2: dataValues[29].value.value,
+              Dust: dataValues[31].value.value,
               Station: 'Tra Vinh Station',
+              createdAt: new Date().getTime(),
               //status signal
-              StatusTemp: getStatus(dataValues[34].value.value),
-              StatusDust: getStatus(dataValues[35].value.value),
-              StatusO2: getStatus(dataValues[33].value.value),
-              StatusSO2: getStatus(dataValues[32].value.value),
-              StatusCO: getStatus(dataValues[31].value.value),
-              StatusNO: getStatus(dataValues[30].value.value)
+              StatusTemp: getStatus(dataValues[36].value.value),
+              StatusDust: getStatus(dataValues[37].value.value),
+              StatusO2: getStatus(dataValues[35].value.value),
+              StatusSO2: getStatus(dataValues[34].value.value),
+              StatusCO: getStatus(dataValues[33].value.value),
+              StatusNO: getStatus(dataValues[32].value.value),
+              StatusConnect: getStatusConnect((dataValues[38].value.value))
             };
-            station3Controller.createNew(dataTerminal3)
+            station3Controller.createNew(data3)
+            io.emit('data', { data1, data2, data3 })
 
             console.log('Đã lưu dữ liệu vào các collections');
           });
@@ -242,7 +263,6 @@ const START_SERVER = async () => {
           console.error('Lỗi khi đọc giá trị từ OPC UA server:', err);
 
         }
-
       }, 60000); // Thực hiện mỗi phút
       // đọc  1s 
       setInterval(async () => {
@@ -267,33 +287,35 @@ const START_SERVER = async () => {
             'ns=2;i=11', //o2 status1
             'ns=2;i=12',  //temp status1
             'ns=2;i=13',  //dust status1
+            'ns=2;i=14', //disconnect 1
             //station2
-            'ns=2;i=15',  //no 2
-            'ns=2;i=16',  //co 2
-            'ns=2;i=17',  //so2 2
-            'ns=2;i=18',  //o2 2
-            'ns=2;i=19',  //temp 2
-            'ns=2;i=20',  //dust 2
-            'ns=2;i=21',  //no status 2
-            'ns=2;i=22', // co status 2
-            'ns=2;i=23',// so2 status 2
-            'ns=2;i=24', //o2 status2
-            'ns=2;i=25', //temp status 2
-            'ns=2;i=26', //dust status 2
+            'ns=2;i=16',  //no 2
+            'ns=2;i=17',  //co 2
+            'ns=2;i=18',  //so2 2
+            'ns=2;i=19',  //o2 2
+            'ns=2;i=20',  //temp 2
+            'ns=2;i=21',  //dust 2
+            'ns=2;i=22',  //no status 2
+            'ns=2;i=23', // co status 2
+            'ns=2;i=24',// so2 status 2
+            'ns=2;i=25', //o2 status2
+            'ns=2;i=26', //temp status 2
+            'ns=2;i=27', //dust status 2
+            'ns=2;i=28', //disconnect 2
             //station3
-            'ns=2;i=28', //no 3
-            'ns=2;i=29', //co 3
-            'ns=2;i=30', //so2 3
-            'ns=2;i=31', //o2 3
-            'ns=2;i=32', //temp3
-            'ns=2;i=33', //dust3
-            'ns=2;i=34', //no status3
-            'ns=2;i=35', //co status3
-            'ns=2;i=36', //so2 status3
-            'ns=2;i=37', //o2 status3
-            'ns=2;i=38', //temp status3
-            'ns=2;i=39', //dust status3
-
+            'ns=2;i=30', //no 3
+            'ns=2;i=31', //co 3
+            'ns=2;i=32', //so2 3
+            'ns=2;i=33', //o2 3
+            'ns=2;i=34', //temp3
+            'ns=2;i=35', //dust3
+            'ns=2;i=36', //no status3
+            'ns=2;i=37', //co status3
+            'ns=2;i=38', //so2 status3
+            'ns=2;i=39', //o2 status3
+            'ns=2;i=40', //temp status3
+            'ns=2;i=41', //dust status3
+            'ns=2;i=42', //disconnect 3
           ];
           const nodeIdsArray = nodeIds.map(nodeId => opcua.resolveNodeId(nodeId));
 
@@ -312,14 +334,24 @@ const START_SERVER = async () => {
                 default:
                   return 'Unknown'; // Trường hợp không hợp lệ, bạn có thể xử lý tuỳ ý
               }
+            }
+            const getStatusConnect = (checkValue) => {
+              switch (checkValue) {
+                case 0:
+                  return 'Connected';
+                case 1:
+                  return 'Disconnected';
+                default:
+                  return 'Unknown'; // Trường hợp không hợp lệ, bạn có thể xử lý tuỳ ý
+              }
             };
             const dataTerminal1 = {
-              CO: dataValues[1].value.value.toFixed(2),
-              NO: dataValues[0].value.value.toFixed(2),
-              SO2: dataValues[2].value.value.toFixed(2),
-              Temperature: dataValues[4].value.value.toFixed(2),
-              O2: dataValues[3].value.value.toFixed(2),
-              Dust: dataValues[5].value.value.toFixed(2),
+              CO: dataValues[1].value.value,
+              NO: dataValues[0].value.value,
+              SO2: dataValues[2].value.value,
+              Temperature: dataValues[4].value.value,
+              O2: dataValues[3].value.value,
+              Dust: dataValues[5].value.value,
               Station: 'Bach Khoa Station',
               createdAt: new Date().getTime(),
               //status signal
@@ -328,46 +360,51 @@ const START_SERVER = async () => {
               StatusO2: getStatus(dataValues[9].value.value),
               StatusSO2: getStatus(dataValues[8].value.value),
               StatusCO: getStatus(dataValues[7].value.value),
-              StatusNO: getStatus(dataValues[6].value.value)
+              StatusNO: getStatus(dataValues[6].value.value),
+              StatusConnect: getStatusConnect((dataValues[12].value.value))
             };
-
+            console.log(dataValues[12].value.value)
             const dataTerminal2 = {
 
-              CO: dataValues[13].value.value.toFixed(2),
-              NO: dataValues[12].value.value.toFixed(2),
-              SO2: dataValues[14].value.value.toFixed(2),
-              Temperature: dataValues[16].value.value.toFixed(2),
-              O2: dataValues[15].value.value.toFixed(2),
-              Dust: dataValues[17].value.value.toFixed(2),
+              CO: dataValues[14].value.value,
+              NO: dataValues[13].value.value,
+              SO2: dataValues[15].value.value,
+              Temperature: dataValues[17].value.value,
+              O2: dataValues[16].value.value,
+              Dust: dataValues[18].value.value,
               Station: 'Hau Giang Station',
               createdAt: new Date().getTime(),
               //status signal
-              StatusTemp: getStatus(dataValues[22].value.value),
-              StatusDust: getStatus(dataValues[23].value.value),
-              StatusO2: getStatus(dataValues[21].value.value),
-              StatusSO2: getStatus(dataValues[20].value.value),
-              StatusCO: getStatus(dataValues[19].value.value),
-              StatusNO: getStatus(dataValues[18].value.value)
+              StatusTemp: getStatus(dataValues[23].value.value),
+              StatusDust: getStatus(dataValues[24].value.value),
+              StatusO2: getStatus(dataValues[22].value.value),
+              StatusSO2: getStatus(dataValues[21].value.value),
+              StatusCO: getStatus(dataValues[20].value.value),
+              StatusNO: getStatus(dataValues[19].value.value),
+              StatusConnect: getStatusConnect((dataValues[25].value.value))
+
             };
 
 
             const dataTerminal3 = {
 
-              CO: dataValues[25].value.value.toFixed(2),
-              NO: dataValues[24].value.value.toFixed(2),
-              SO2: dataValues[26].value.value.toFixed(2),
-              Temperature: dataValues[28].value.value.toFixed(2),
-              O2: dataValues[27].value.value.toFixed(2),
-              Dust: dataValues[29].value.value.toFixed(2),
+              CO: dataValues[27].value.value,
+              NO: dataValues[26].value.value,
+              SO2: dataValues[28].value.value,
+              Temperature: dataValues[30].value.value,
+              O2: dataValues[29].value.value,
+              Dust: dataValues[31].value.value,
               Station: 'Tra Vinh Station',
               createdAt: new Date().getTime(),
               //status signal
-              StatusTemp: getStatus(dataValues[34].value.value),
-              StatusDust: getStatus(dataValues[35].value.value),
-              StatusO2: getStatus(dataValues[33].value.value),
-              StatusSO2: getStatus(dataValues[32].value.value),
-              StatusCO: getStatus(dataValues[31].value.value),
-              StatusNO: getStatus(dataValues[30].value.value)
+              StatusTemp: getStatus(dataValues[36].value.value),
+              StatusDust: getStatus(dataValues[37].value.value),
+              StatusO2: getStatus(dataValues[35].value.value),
+              StatusSO2: getStatus(dataValues[34].value.value),
+              StatusCO: getStatus(dataValues[33].value.value),
+              StatusNO: getStatus(dataValues[32].value.value),
+              StatusConnect: getStatusConnect((dataValues[38].value.value))
+
             };
 
             io.emit('data1s', { dataTerminal1, dataTerminal2, dataTerminal3 })
@@ -378,7 +415,7 @@ const START_SERVER = async () => {
 
         }
 
-      }, 5000); // Thực hiện mỗi phút
+      }, 5000);
     } catch (err) {
       console.error('Không thể kết nối tới OPC UA server:', err);
       process.exit(1);

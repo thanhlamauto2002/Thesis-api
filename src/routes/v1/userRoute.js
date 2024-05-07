@@ -1,6 +1,4 @@
 import express from 'express'
-import { StatusCodes } from 'http-status-codes'
-import { userValidation } from '~/validations/userValidation'
 import { userController } from '~/controllers/userController'
 import { checkRoleUser } from '~/middlewares/JWTaction'
 const Router = express.Router()

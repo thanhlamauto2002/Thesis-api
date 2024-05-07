@@ -1,6 +1,4 @@
 import jwt from 'jsonwebtoken'
-import { env } from '~/config/environment'
-const cookieParser = require('cookie-parser');
 
 const createJWT = (payload) => {
   let key = process.env.JWT_SECRET

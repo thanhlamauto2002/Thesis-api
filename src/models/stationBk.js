@@ -1,6 +1,5 @@
 import Joi from 'joi'
 import { GET_DB } from '~/config/mongodb'
-const { ObjectId } = require('mongodb');
 const moment = require('moment');
 const BK_COLLECTION_NAME = 'BKstation'
 const BK_COLLECTION_SCHEMA = Joi.object({
@@ -17,16 +16,13 @@ const BK_COLLECTION_SCHEMA = Joi.object({
   StatusCO: Joi.string().required(),
   StatusNO: Joi.string().required(),
   StatusO2: Joi.string().required(),
-  createdAt: Joi.date().timestamp('javascript').default(Date.now)
+  StatusConnect: Joi.string().required(),
+  createdAt: Joi.number().required()
 })
-
 // Validate data
-
 const validateBeforeCreate = async (data) => {
-
   return await BK_COLLECTION_SCHEMA.validateAsync(data, { abortEarly: false })
 }
-
 //Ghi data vào db
 const createNew = async (data) => {
   try {
@@ -57,7 +53,7 @@ const getData = async (startDate, endDate) => {
   }
 }
 
-//Hàm lấy data vẽ chart
+//Hàm lấy data vẽ trend
 
 const getDataChart = async (option) => {
   try {
@@ -81,7 +77,6 @@ const getDataChart = async (option) => {
       default:
         throw new Error('Invalid option')
     }
-
     return data1
   } catch (error) {
     return null
