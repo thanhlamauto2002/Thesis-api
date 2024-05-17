@@ -31,6 +31,7 @@
     "mongodb": "^6.0.0",
     "mongoose": "^8.2.1",
     "node-opcua": "^2.123.0",
+    "nodemailer": "^6.9.13",
     "opcua": "^1.0.0",
     "socket.io": "^4.7.5",
     "xlsx-populate": "^1.21.0"

@@ -10,12 +10,17 @@ import { errorHandlingMiddleware } from './middlewares/errorHandlingMiddleware'
 import { station1Controller } from '~/controllers/stationBk'
 import { station2Controller } from '~/controllers/stationHg'
 import { station3Controller } from '~/controllers/stationTv'
-
+const app = express()
+var bodyParser = require('body-parser');
+app.use(bodyParser.json({ limit: '50mb' }));
+app.use(bodyParser.urlencoded({ limit: '50mb', extended: true, parameterLimit: 50000 }));
 const opcua = require('node-opcua');
 var cookieParser = require('cookie-parser')
 const { Server } = require('socket.io')
 const http = require('http')
-const app = express()
+const nodemailer = require('nodemailer');
+
+
 
 app.use(cookieParser())
 
@@ -47,7 +52,7 @@ const START_SERVER = async () => {
     fetchDataFromMongoDBAndEmitData(socket); // Gửi dữ liệu khi có kết nối mới
 
     const interval = setInterval(() => {
-      fetchDataFromMongoDBAndEmitData(socket);
+      // fetchDataFromMongoDBAndEmitData(socket);
     }, 1000); // 60000 milliseconds = 1 phút
     //alarm BK
     socket.on('saveAlarmsBK', (data) => {
@@ -92,335 +97,200 @@ const START_SERVER = async () => {
     // process.exit(0)
     res.end('<h1>Hello World!</h1><hr>')
   })
-  //lấy dữ liệu từ OPC UA
-  // const endpointUrl = 'opc.tcp://10.143.161.1:4880';
-  const endpointUrl = 'opc.tcp://192.168.220.151:4840';
-  let opcConnected = false;
-  const client = opcua.OPCUAClient.create({ endpoint_must_exist: false });
-  (async () => {
-    try {
-      // Kết nối đến OPC UA server
-      await client.connect(endpointUrl);
-      console.log('Đã kết nối tới OPC UA server');
+  //gui mail
 
-      client.on('backoff', () => {
-        io.emit('disconnectOPC', 'OPC UA disconnected');
+
+  //
+
+
+  //OPC UA
+
+  const connectionPool = new Map();
+  function checkConnection(endpointUrl, timeout) {
+    return new Promise((resolve, reject) => {
+      const client = opcua.OPCUAClient.create();
+
+      const timerId = setTimeout(() => {
+        client.disconnect(() => {
+          reject(new Error('Timeout khi kết nối tới OPC UA Server'));
+        });
+      }, timeout);
+
+      client.connect(endpointUrl, (err) => {
+        clearTimeout(timerId);
+        if (err) {
+          reject(err);
+        } else {
+          resolve(client); // Trả về đối tượng client nếu kết nối thành công
+        }
       });
-      // Tạo một session
-      const session = await client.createSession();
+    });
+  }
 
+  async function initializeConnection(ip) {
+    const endpointUrl = `opc.tcp://${ip}:4840`;
+    const timeout = 5000; // Thời gian timeout là 5 giây
+    try {
+      // Kiểm tra kết nối đến OPC UA server trước khi khởi tạo kết nối và session
+      const client = await checkConnection(endpointUrl, timeout);
+      console.log(`Đã kết nối tới OPC UA server: ${ip}`);
+      io.emit('connectionSuccess', `Đã kết nối tới OPC UA Server ${ip}`)
+      const session = await client.createSession();
       console.log('Đã tạo session');
 
-      // Đọc dữ liệu từ OPC UA server và lưu vào các collections mỗi phút
-      setInterval(async () => {
+      const opcServerInfo = await GET_DB().collection('OPCServerList').findOne({ IP: ip });
+      if (!opcServerInfo) {
+        throw new Error(`Không tìm thấy thông tin OPC Server với IP: ${ip}`);
+      }
+
+      const { Station, servers } = opcServerInfo;
+
+      // Kiểm tra và thêm Station vào StationList nếu chưa tồn tại
+      const stationInfo = await GET_DB().collection('StationList').findOne({ Station: Station });
+      if (!stationInfo) {
+        await GET_DB().collection('StationList').insertOne({
+          Station: Station,
+        });
+      }
+
+      // Lưu kết nối và session vào pool
+      connectionPool.set(ip, { client, session });
+    } catch (error) {
+      console.error(`Lỗi khi kết nối và khởi tạo session tới OPC UA Server ${ip}:`, error);
+      await GET_DB().collection('OPCServerList').deleteOne({ IP: ip });
+      io.emit('connectionError', `Không kết nối được tới ${ip}`)
+      // Thực hiện xử lý lỗi khác nếu cần thiết
+    }
+  }
+  async function readDataFromOPCServers() {
+    try {
+      // Lấy danh sách OPC Servers từ MongoDB
+      const opcServers = await GET_DB().collection('OPCServerList').find({}).toArray();
+      const collection = await GET_DB().collection('OPCData');
+
+      // Tạo mảng các promise để khởi tạo kết nối đồng thời tới các OPC Server
+      const connectionPromises = opcServers.map(async (opcServer) => {
+        const { IP, Station, servers } = opcServer;
+
         try {
-          // Lấy ngày và giờ hiện tại
-          // const currentDate = new Date();
-          // const date = currentDate.toLocaleDateString();
-          // const time = currentDate.toLocaleTimeString();
+          // Kiểm tra xem kết nối đã được khởi tạo chưa
+          if (!connectionPool.has(IP)) {
+            console.log('Đang khởi tạo kết nối tới OPC UA server:', IP);
+            const stationInfo = await GET_DB().collection('StationList').findOne({ Station });
+            if (stationInfo) {
+              await GET_DB().collection('StationList').deleteOne({ Station: Station });
+            }
+            await initializeConnection(IP);
+          }
 
-          // Mảng các nodeId cần đọc dữ liệu
-          const nodeIds = [
-            //station1
-            'ns=2;i=2',  //no 1
-            'ns=2;i=3',  //co 1
-            'ns=2;i=4',  //SO2 1
-            'ns=2;i=5',  //O2 1
-            'ns=2;i=6',  //Temp 1
-            'ns=2;i=7',  //Dust 1
-            'ns=2;i=8',  //no status 1
-            'ns=2;i=9',  //co status1
-            'ns=2;i=10', //so2 status1
-            'ns=2;i=11', //o2 status1
-            'ns=2;i=12',  //temp status1
-            'ns=2;i=13',  //dust status1
-            'ns=2;i=14', //disconnect 1
-            //station2
-            'ns=2;i=16',  //no 2
-            'ns=2;i=17',  //co 2
-            'ns=2;i=18',  //so2 2
-            'ns=2;i=19',  //o2 2
-            'ns=2;i=20',  //temp 2
-            'ns=2;i=21',  //dust 2
-            'ns=2;i=22',  //no status 2
-            'ns=2;i=23', // co status 2
-            'ns=2;i=24',// so2 status 2
-            'ns=2;i=25', //o2 status2
-            'ns=2;i=26', //temp status 2
-            'ns=2;i=27', //dust status 2
-            'ns=2;i=28', //disconnect 2
-            //station3
-            'ns=2;i=30', //no 3
-            'ns=2;i=31', //co 3
-            'ns=2;i=32', //so2 3
-            'ns=2;i=33', //o2 3
-            'ns=2;i=34', //temp3
-            'ns=2;i=35', //dust3
-            'ns=2;i=36', //no status3
-            'ns=2;i=37', //co status3
-            'ns=2;i=38', //so2 status3
-            'ns=2;i=39', //o2 status3
-            'ns=2;i=40', //temp status3
-            'ns=2;i=41', //dust status3
-            'ns=2;i=42', //disconnect 3
-          ];
-          const nodeIdsArray = nodeIds.map(nodeId => opcua.resolveNodeId(nodeId));
+          // Lấy kết nối và session từ pool
+          const { client, session } = connectionPool.get(IP);
 
-          // Đọc dữ liệu từ các nodeId
-          session.readVariableValue(nodeIdsArray, (err, dataValues) => {
-            // Đọc dữ liệu từ các nodeId
-            //const dataValues = await session.read(nodeIds);
-            const getStatus = (checkValue) => {
-              switch (checkValue) {
-                case 0:
-                  return 'Normal';
-                case 1:
-                  return 'Calib';
-                case 2:
-                  return 'Error';
-                default:
-                  return 'Unknown'; // Trường hợp không hợp lệ, bạn có thể xử lý tuỳ ý
-              }
-            };
-            const getStatusConnect = (checkValue) => {
-              switch (checkValue) {
-                case 0:
-                  return 'Connected';
-                case 1:
-                  return 'Disconnected';
-                default:
-                  return 'Unknown'; // Trường hợp không hợp lệ, bạn có thể xử lý tuỳ ý
-              }
-            };
-            const data1 = {
-              CO: dataValues[1].value.value,
-              NO: dataValues[0].value.value,
-              SO2: dataValues[2].value.value,
-              Temperature: dataValues[4].value.value,
-              O2: dataValues[3].value.value,
-              Dust: dataValues[5].value.value,
-              Station: 'Bach Khoa Station',
-              createdAt: new Date().getTime(),
-              //status signal
-              StatusTemp: getStatus(dataValues[10].value.value),
-              StatusDust: getStatus(dataValues[11].value.value),
-              StatusO2: getStatus(dataValues[9].value.value),
-              StatusSO2: getStatus(dataValues[8].value.value),
-              StatusCO: getStatus(dataValues[7].value.value),
-              StatusNO: getStatus(dataValues[6].value.value),
-              StatusConnect: getStatusConnect((dataValues[12].value.value))
-            };
-            station1Controller.createNew(data1)
+          // Đối tượng chứa dữ liệu đọc từ các nodes của OPC Server
+          const dataObject = {
+            Station: Station,
+            createdAt: new Date().getTime(),
+          };
+          // Đọc dữ liệu từ các node của OPC Server
+          for (const server of servers) {
+            const stationInfo = await GET_DB().collection('StationList').findOne({ Station });
+            const { parameterName, namespace, nodeId, setpoint } = server;
 
-            const data2 = {
+            // Tạo nodeId từ thông tin namespace và nodeId
+            const fullNodeId = `ns=${namespace};i=${nodeId}`;
 
-              CO: dataValues[14].value.value,
-              NO: dataValues[13].value.value,
-              SO2: dataValues[15].value.value,
-              Temperature: dataValues[17].value.value,
-              O2: dataValues[16].value.value,
-              Dust: dataValues[18].value.value,
-              Station: 'Hau Giang Station',
-              createdAt: new Date().getTime(),
-              //status signal
-              StatusTemp: getStatus(dataValues[23].value.value),
-              StatusDust: getStatus(dataValues[24].value.value),
-              StatusO2: getStatus(dataValues[22].value.value),
-              StatusSO2: getStatus(dataValues[21].value.value),
-              StatusCO: getStatus(dataValues[20].value.value),
-              StatusNO: getStatus(dataValues[19].value.value),
-              StatusConnect: getStatusConnect((dataValues[25].value.value))
-            };
+            // Đọc giá trị từ nodeId
+            const dataValue = await session.read({ nodeId: opcua.resolveNodeId(fullNodeId) });
+            const value = dataValue.value.value;
+            if (parameterName === 'CO' || parameterName === 'NO' || parameterName === 'SO2' || parameterName === 'Dust') {
+              // Lưu giá trị setpoint vào dataObject
+              dataObject[`${parameterName}_setpoint`] = setpoint;
+            }
+            if (!parameterName.startsWith('Status')) {
+              dataObject[parameterName] = value;
+            } else {
+              if (parameterName !== 'StatusStation') {
+                const statusPropertyName = `${parameterName}`;
+                dataObject[statusPropertyName] = getStatus(value);
+              } else {
+                const statusPropertyName = `${parameterName}`;
+                dataObject[statusPropertyName] = getStatusConnect(value);
 
-            station2Controller.createNew(data2)
-
-            const data3 = {
-
-              CO: dataValues[27].value.value,
-              NO: dataValues[26].value.value,
-              SO2: dataValues[28].value.value,
-              Temperature: dataValues[30].value.value,
-              O2: dataValues[29].value.value,
-              Dust: dataValues[31].value.value,
-              Station: 'Tra Vinh Station',
-              createdAt: new Date().getTime(),
-              //status signal
-              StatusTemp: getStatus(dataValues[36].value.value),
-              StatusDust: getStatus(dataValues[37].value.value),
-              StatusO2: getStatus(dataValues[35].value.value),
-              StatusSO2: getStatus(dataValues[34].value.value),
-              StatusCO: getStatus(dataValues[33].value.value),
-              StatusNO: getStatus(dataValues[32].value.value),
-              StatusConnect: getStatusConnect((dataValues[38].value.value))
-            };
-            station3Controller.createNew(data3)
-            io.emit('data', { data1, data2, data3 })
-
-            console.log('Đã lưu dữ liệu vào các collections');
-          });
-
-        } catch (err) {
-          console.error('Lỗi khi đọc giá trị từ OPC UA server:', err);
-
-        }
-      }, 60000); // Thực hiện mỗi phút
-      // đọc  1s 
-      setInterval(async () => {
-        try {
-          // Lấy ngày và giờ hiện tại
-          // const currentDate = new Date();
-          // const date = currentDate.toLocaleDateString();
-          // const time = currentDate.toLocaleTimeString();
-
-          // Mảng các nodeId cần đọc dữ liệu
-          const nodeIds = [
-            //station1
-            'ns=2;i=2',  //no 1
-            'ns=2;i=3',  //co 1
-            'ns=2;i=4',  //SO2 1
-            'ns=2;i=5',  //O2 1
-            'ns=2;i=6',  //Temp 1
-            'ns=2;i=7',  //Dust 1
-            'ns=2;i=8',  //no status 1
-            'ns=2;i=9',  //co status1
-            'ns=2;i=10', //so2 status1
-            'ns=2;i=11', //o2 status1
-            'ns=2;i=12',  //temp status1
-            'ns=2;i=13',  //dust status1
-            'ns=2;i=14', //disconnect 1
-            //station2
-            'ns=2;i=16',  //no 2
-            'ns=2;i=17',  //co 2
-            'ns=2;i=18',  //so2 2
-            'ns=2;i=19',  //o2 2
-            'ns=2;i=20',  //temp 2
-            'ns=2;i=21',  //dust 2
-            'ns=2;i=22',  //no status 2
-            'ns=2;i=23', // co status 2
-            'ns=2;i=24',// so2 status 2
-            'ns=2;i=25', //o2 status2
-            'ns=2;i=26', //temp status 2
-            'ns=2;i=27', //dust status 2
-            'ns=2;i=28', //disconnect 2
-            //station3
-            'ns=2;i=30', //no 3
-            'ns=2;i=31', //co 3
-            'ns=2;i=32', //so2 3
-            'ns=2;i=33', //o2 3
-            'ns=2;i=34', //temp3
-            'ns=2;i=35', //dust3
-            'ns=2;i=36', //no status3
-            'ns=2;i=37', //co status3
-            'ns=2;i=38', //so2 status3
-            'ns=2;i=39', //o2 status3
-            'ns=2;i=40', //temp status3
-            'ns=2;i=41', //dust status3
-            'ns=2;i=42', //disconnect 3
-          ];
-          const nodeIdsArray = nodeIds.map(nodeId => opcua.resolveNodeId(nodeId));
-
-          // Đọc dữ liệu từ các nodeId
-          session.readVariableValue(nodeIdsArray, (err, dataValues) => {
-            // Đọc dữ liệu từ các nodeId
-            //const dataValues = await session.read(nodeIds);
-            const getStatus = (checkValue) => {
-              switch (checkValue) {
-                case 0:
-                  return 'Normal';
-                case 1:
-                  return 'Calib';
-                case 2:
-                  return 'Error';
-                default:
-                  return 'Unknown'; // Trường hợp không hợp lệ, bạn có thể xử lý tuỳ ý
               }
             }
-            const getStatusConnect = (checkValue) => {
-              switch (checkValue) {
-                case 0:
-                  return 'Connected';
-                case 1:
-                  return 'Disconnected';
-                default:
-                  return 'Unknown'; // Trường hợp không hợp lệ, bạn có thể xử lý tuỳ ý
-              }
-            };
-            const dataTerminal1 = {
-              CO: dataValues[1].value.value,
-              NO: dataValues[0].value.value,
-              SO2: dataValues[2].value.value,
-              Temperature: dataValues[4].value.value,
-              O2: dataValues[3].value.value,
-              Dust: dataValues[5].value.value,
-              Station: 'Bach Khoa Station',
-              createdAt: new Date().getTime(),
-              //status signal
-              StatusTemp: getStatus(dataValues[10].value.value),
-              StatusDust: getStatus(dataValues[11].value.value),
-              StatusO2: getStatus(dataValues[9].value.value),
-              StatusSO2: getStatus(dataValues[8].value.value),
-              StatusCO: getStatus(dataValues[7].value.value),
-              StatusNO: getStatus(dataValues[6].value.value),
-              StatusConnect: getStatusConnect((dataValues[12].value.value))
-            };
-            console.log(dataValues[12].value.value)
-            const dataTerminal2 = {
+            if (parameterName === 'Latitude') {
 
-              CO: dataValues[14].value.value,
-              NO: dataValues[13].value.value,
-              SO2: dataValues[15].value.value,
-              Temperature: dataValues[17].value.value,
-              O2: dataValues[16].value.value,
-              Dust: dataValues[18].value.value,
-              Station: 'Hau Giang Station',
-              createdAt: new Date().getTime(),
-              //status signal
-              StatusTemp: getStatus(dataValues[23].value.value),
-              StatusDust: getStatus(dataValues[24].value.value),
-              StatusO2: getStatus(dataValues[22].value.value),
-              StatusSO2: getStatus(dataValues[21].value.value),
-              StatusCO: getStatus(dataValues[20].value.value),
-              StatusNO: getStatus(dataValues[19].value.value),
-              StatusConnect: getStatusConnect((dataValues[25].value.value))
-
-            };
+              await GET_DB().collection('StationList').updateOne(
+                { Station: Station },
+                { $set: { Latitude: value } }
+              );
 
 
-            const dataTerminal3 = {
+            }
+            if (parameterName === 'Longitude') {
+              await GET_DB().collection('StationList').updateOne(
+                { Station: Station },
+                { $set: { Longitude: value } }
+              );
 
-              CO: dataValues[27].value.value,
-              NO: dataValues[26].value.value,
-              SO2: dataValues[28].value.value,
-              Temperature: dataValues[30].value.value,
-              O2: dataValues[29].value.value,
-              Dust: dataValues[31].value.value,
-              Station: 'Tra Vinh Station',
-              createdAt: new Date().getTime(),
-              //status signal
-              StatusTemp: getStatus(dataValues[36].value.value),
-              StatusDust: getStatus(dataValues[37].value.value),
-              StatusO2: getStatus(dataValues[35].value.value),
-              StatusSO2: getStatus(dataValues[34].value.value),
-              StatusCO: getStatus(dataValues[33].value.value),
-              StatusNO: getStatus(dataValues[32].value.value),
-              StatusConnect: getStatusConnect((dataValues[38].value.value))
+            }
+          }
 
-            };
+          // Lưu dữ liệu vào MongoDB
+          await collection.insertOne(dataObject);
+          io.emit('opcData', { station: Station, data: dataObject });
 
-            io.emit('data1s', { dataTerminal1, dataTerminal2, dataTerminal3 })
-          });
-
-        } catch (err) {
-          console.error('Lỗi khi đọc giá trị từ OPC UA server:', err);
-
+        } catch (error) {
+          console.error(`Lỗi khi đọc dữ liệu từ OPC UA Server ${IP}:`, error);
         }
 
-      }, 5000);
-    } catch (err) {
-      console.error('Không thể kết nối tới OPC UA server:', err);
-      process.exit(1);
+      });
+
+      // Chạy các promise song song và chờ cho đến khi tất cả hoàn thành
+      await Promise.all(connectionPromises);
+
+      console.log('Đã đọc dữ liệu từ tất cả OPC Servers thành công');
+    } catch (error) {
+      console.error('Lỗi khi đọc dữ liệu từ các OPC Server:', error);
     }
-  })();
+  }
+  function getStatus(statusValue) {
+    switch (statusValue) {
+      case 0:
+        return 'Normal';
+      case 1:
+        return 'Error';
+      case 2:
+        return 'Calib';
+      default:
+        return 'Unknown';
+    }
+  }
+  function getStatusConnect(checkValue) {
+    switch (checkValue) {
+      case 0:
+        return 'Connected';
+      case 1:
+        return 'Disconnected';
+      default:
+        return 'Unknown'; // Trường hợp không hợp lệ, bạn có thể xử lý tuỳ ý
+    }
+  }
+  async function fetchDataFromOPCServersPeriodically() {
+    // Sử dụng vòng lặp vô hạn để thực hiện việc đọc dữ liệu mỗi giây
+    setInterval(async () => {
+      try {
+        // Gọi hàm đọc dữ liệu từ OPC Servers
+        await readDataFromOPCServers();
+      } catch (error) {
+        console.error('Lỗi khi đọc dữ liệu từ các OPC Servers:', error);
+      }
+    }, 1000); // 1000 milliseconds = 1 giây
+  }
+
+  // Bắt đầu đọc dữ liệu từ OPC Servers mỗi giây
+  fetchDataFromOPCServersPeriodically()
+
   //
   server.listen(env.APP_PORT, env.APP_HOST, () => {
     console.log(`Hello ${env.AUTHOR}, I am running at http://${env.APP_HOST}:${env.APP_PORT}/`)
@@ -432,10 +302,7 @@ const START_SERVER = async () => {
 
   })
 
-
 }
-
-
 // phải kết nối được với database mới start server
 CONNECT_DB()
   .then(() => console.log('Connected to MongoDB Local'))
