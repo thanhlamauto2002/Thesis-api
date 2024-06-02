@@ -17,6 +17,7 @@ const validateBeforeCreate = async (data) => {
 
 const createNew = async (data) => {
   try {
+    console.log(data)
     const validData = await validateBeforeCreate(data)
     const createUser = await GET_DB().collection(STATION_COLLECTION_NAME).insertOne(validData)
     return createUser
