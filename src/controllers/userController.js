@@ -67,6 +67,26 @@ const editUser = async (req, res) => {
     throw new Error(error)
   }
 }
+const updatePermission = async (req, res) => {
+  try {
+    const getData = await userService.updatePermission(req.body)
+    res.status(201).json(getData)
+
+  } catch (error) {
+    throw new Error(error)
+
+  }
+}
+const getPermissions = async (req, res) => {
+  try {
+    const getData = await userService.getPermissions()
+    res.status(201).json(getData)
+
+  } catch (error) {
+    throw new Error(error)
+
+  }
+}
 export const userController = {
   createNew,
   handleUserLogin,
@@ -74,5 +94,7 @@ export const userController = {
   getAllUser,
   deleteUser,
   getUser,
-  editUser
+  editUser,
+  updatePermission,
+  getPermissions
 }

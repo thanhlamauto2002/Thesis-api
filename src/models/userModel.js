@@ -71,6 +71,8 @@ const createNew = async (data) => {
 const handleUserLogin = async (data) => {
   try {
     const user = await GET_DB().collection(USER_COLLECTION_NAME).findOne({ email: data.email })
+    const userPermission = await GET_DB().collection('Authorize').findOne({ email: data.email })
+
 
     if (!user || !await bcrypt.compare(data.password, user.password)) {
       return { message: 'Invalid email or password' }
@@ -80,7 +82,8 @@ const handleUserLogin = async (data) => {
     let payload = {
       email: user.email,
       username: user.username,
-      role: user.role
+      role: user.role,
+      userPermission: userPermission
     }
     let accessToken = createJWT(payload)
     return {
@@ -144,6 +147,36 @@ const editUser = async (data) => {
     throw new Error(error)
   }
 }
+
+
+const updatePermission = async (data) => {
+  try {
+
+    const checkExistingUser = await GET_DB().collection('Authorize').findOne({ email: data.email })
+    if (!checkExistingUser) {
+      const createUser = await GET_DB().collection('Authorize').insertOne(data)
+    }
+    else {
+      const cursor = await GET_DB().collection('Authorize').updateOne(
+        { email: data.email }, // Điều kiện tìm kiếm: tìm bản ghi với email cụ thể
+        { $set: { email: data.email, permissions: data.permissions } } // Dữ liệu cần cập nhật
+      )
+    }
+    return {
+      edit: true
+    }
+  } catch (error) {
+    throw new Error(error)
+  }
+}
+const getPermissions = async () => {
+  try {
+    const cursor = await GET_DB().collection('Authorize').find({}).toArray()
+    return cursor
+  } catch (error) {
+    throw new Error(error)
+  }
+}
 export const userModel = {
   USER_COLLECTION_NAME,
   USER_COLLECTION_SCHEMA,
@@ -152,5 +185,7 @@ export const userModel = {
   getAllUser,
   deleteUser,
   getUser,
-  editUser
+  editUser,
+  updatePermission,
+  getPermissions
 }

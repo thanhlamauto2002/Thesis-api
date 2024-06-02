@@ -24,4 +24,8 @@ Router.route('/getuser')
 //api decode token
 Router.route('/verifytoken')
   .post(userController.handToken)
+Router.route('/updatePermissions')
+  .post(userController.updatePermission)
+Router.route('/getPermissions')
+  .get(userController.getPermissions)
 export const userRoute = Router

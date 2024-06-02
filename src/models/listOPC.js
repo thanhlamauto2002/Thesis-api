@@ -4,6 +4,7 @@ const COLLECTION_NAME = 'OPCServerList'
 
 const createNew = async (req, res) => {
   const document = {
+    FirstConnect: req.body.FirstConnect,
     IP: req.body.IP,
     Station: req.body.Station,
     servers: req.body.nodes

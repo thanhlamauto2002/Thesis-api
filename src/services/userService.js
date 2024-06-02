@@ -74,11 +74,31 @@ const editUser = async (reqBody) => {
   }
 }
 
+const updatePermission = async (reqBody) => {
+  // eslint-disable-next-line no-useless-catch
+  try {
+    const data = await userModel.updatePermission(reqBody)
+    return data
+  } catch (error) {
+    throw new Error(error)
+  }
+}
+const getPermissions = async () => {
+  // eslint-disable-next-line no-useless-catch
+  try {
+    const data = await userModel.getPermissions()
+    return data
+  } catch (error) {
+    throw new Error(error)
+  }
+}
 export const userService = {
   createNew,
   handleUserLogin,
   getAllUser,
   deleteUser,
   getUser,
-  editUser
+  editUser,
+  updatePermission,
+  getPermissions
 }

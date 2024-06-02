@@ -4,6 +4,8 @@ import { StatusCodes } from 'http-status-codes'
 
 //hàm tạo station
 const createNew = async (req, res, next) => {
+  console.log(req.body)
+
   try {
     const createUser = await listStationService.createNew(req.body)
     res.status(StatusCodes.CREATED).json(createUser)

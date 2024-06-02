@@ -127,13 +127,20 @@ const START_SERVER = async () => {
     });
   }
 
-  async function initializeConnection(ip) {
+  async function initializeConnection(ip, checkFirst) {
+
     const endpointUrl = `opc.tcp://${ip}:4840`;
     const timeout = 5000; // Thời gian timeout là 5 giây
     try {
       // Kiểm tra kết nối đến OPC UA server trước khi khởi tạo kết nối và session
+
       const client = await checkConnection(endpointUrl, timeout);
+
       console.log(`Đã kết nối tới OPC UA server: ${ip}`);
+      await GET_DB().collection('OPCServerList').updateOne(
+        { IP: ip }, // Điều kiện tìm kiếm: tìm bản ghi với email cụ thể
+        { $set: { FirstConnect: 0 } } // Dữ liệu cần cập nhật
+      )
       io.emit('connectionSuccess', `Đã kết nối tới OPC UA Server ${ip}`)
       const session = await client.createSession();
       console.log('Đã tạo session');
@@ -155,10 +162,15 @@ const START_SERVER = async () => {
 
       // Lưu kết nối và session vào pool
       connectionPool.set(ip, { client, session });
+
+
     } catch (error) {
       console.error(`Lỗi khi kết nối và khởi tạo session tới OPC UA Server ${ip}:`, error);
-      await GET_DB().collection('OPCServerList').deleteOne({ IP: ip });
-      io.emit('connectionError', `Không kết nối được tới ${ip}`)
+      if (checkFirst === 1) {
+        await GET_DB().collection('OPCServerList').deleteOne({ IP: ip });
+        io.emit('connectionError', `Không kết nối được tới ${ip}`)
+
+      }
       // Thực hiện xử lý lỗi khác nếu cần thiết
     }
   }
@@ -170,7 +182,7 @@ const START_SERVER = async () => {
 
       // Tạo mảng các promise để khởi tạo kết nối đồng thời tới các OPC Server
       const connectionPromises = opcServers.map(async (opcServer) => {
-        const { IP, Station, servers } = opcServer;
+        const { FirstConnect, IP, Station, servers } = opcServer;
 
         try {
           // Kiểm tra xem kết nối đã được khởi tạo chưa
@@ -180,11 +192,18 @@ const START_SERVER = async () => {
             if (stationInfo) {
               await GET_DB().collection('StationList').deleteOne({ Station: Station });
             }
-            await initializeConnection(IP);
+            await initializeConnection(IP, FirstConnect);
           }
 
           // Lấy kết nối và session từ pool
           const { client, session } = connectionPool.get(IP);
+          // if (!client.isConnected) {
+          //   console.log(`Mất kết nối tới OPC UA server: ${IP}, đang tái kết nối...`);
+          //   connectionPool.delete(IP);
+          //   console.log(connectionPool)
+          //   io.emit('connectionLost', `Kết nối tới OPC UA Server ${IP} đã bị ngắt.`);
+          //   await initializeConnection(IP);
+          // }
 
           // Đối tượng chứa dữ liệu đọc từ các nodes của OPC Server
           const dataObject = {
@@ -215,9 +234,9 @@ const START_SERVER = async () => {
               } else {
                 const statusPropertyName = `${parameterName}`;
                 dataObject[statusPropertyName] = getStatusConnect(value);
-
               }
             }
+
             if (parameterName === 'Latitude') {
 
               await GET_DB().collection('StationList').updateOne(
@@ -229,11 +248,13 @@ const START_SERVER = async () => {
             }
             if (parameterName === 'Longitude') {
               await GET_DB().collection('StationList').updateOne(
+
                 { Station: Station },
                 { $set: { Longitude: value } }
               );
 
             }
+
           }
 
           // Lưu dữ liệu vào MongoDB
@@ -242,6 +263,11 @@ const START_SERVER = async () => {
 
         } catch (error) {
           console.error(`Lỗi khi đọc dữ liệu từ OPC UA Server ${IP}:`, error);
+          if (connectionPool.has(IP)) {
+            console.log(`Kết nối tới OPC UA server ${IP} bị ngắt. Xóa kết nối khỏi connectionPool.`);
+            connectionPool.delete(IP);
+            io.emit('connectionLost', `Kết nối tới OPC UA Server ${IP} đã bị ngắt.`);
+          }
         }
 
       });
